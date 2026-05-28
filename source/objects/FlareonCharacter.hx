@@ -32,10 +32,6 @@ class FlareonCharacter extends Character
 	static inline final FIREBALL_HEIGHT:Int = 54;
 	static inline final FIREBALL_DURATION:Float = 0.28;
 	static inline final FIREBALL_TRAVEL:Float = 250;
-	static inline final IDLE_POSE_SPREAD:Float = 5;
-	static inline final IDLE_SWAY:Float = 0.22;
-	static inline final SQUASH_AMOUNT:Float = 0.055;
-	static inline final STRETCH_AMOUNT:Float = 0.07;
 
 	var tail:FlxSprite;
 	var backLegBack:FlxSprite;
@@ -57,8 +53,6 @@ class FlareonCharacter extends Character
 	var currentAnim:String = 'idle';
 	var currentMouthShape:String = '';
 	var mouthIsOpen:Bool = false;
-	var poseScaleX:Float = 1;
-	var poseScaleY:Float = 1;
 
 	public function new(x:Float, y:Float, ?character:String = 'flareon', ?isPlayer:Bool = false)
 	{
@@ -91,7 +85,7 @@ class FlareonCharacter extends Character
 		fireball.visible = false;
 
 		for (anim in [
-			'idle', 'idle-loop', 'danceLeft', 'danceRight', 'hey',
+			'idle', 'idle-loop', 'hey',
 			'singLEFT', 'singDOWN', 'singUP', 'singRIGHT',
 			'singLEFT-loop', 'singDOWN-loop', 'singUP-loop', 'singRIGHT-loop',
 			'singLEFTmiss', 'singDOWNmiss', 'singUPmiss', 'singRIGHTmiss',
@@ -230,32 +224,21 @@ class FlareonCharacter extends Character
 	{
 		time += elapsed;
 
-		var idleSide:Float = switch(currentAnim)
-		{
-			case 'danceLeft': -1;
-			case 'danceRight': 1;
-			default: 0;
-		}
-		var idlePulse:Float = Math.sin(time * 4);
-		setSquashStretch(idlePulse, 0.45);
-
 		var bodyBob = Math.sin(time * 2) * 3;
 		var bodyBreath = 1 + Math.sin(time * 1.2) * 0.02;
-		var bodyLean:Float = idleSide * IDLE_SWAY + Math.sin(time * 1.4) * 0.08;
-		var idleShift:Float = idleSide * IDLE_POSE_SPREAD;
-		positionPart(body, idleShift, bodyBob, bodyLean, bodyBreath, bodyBreath);
-		positionLegs(idleShift, bodyBob, bodyLean, bodyBreath, bodyBreath, Math.sin(time * 2.8) * 2.2 + idleSide * 2, Math.sin(time * 2.2) * 1.4, Math.sin(time * 1.6) * 0.5);
+		positionPart(body, 0, bodyBob, 0, bodyBreath, bodyBreath);
+		positionLegs(0, bodyBob, 0, bodyBreath, bodyBreath, Math.sin(time * 2.8) * 2.2, Math.sin(time * 2.2) * 1.4, Math.sin(time * 1.6) * 0.5);
 
 		var headBob = bodyBob * 0.3 + Math.sin(time * 2.2);
 		var headWiggle = Math.sin(time * 4) * 2;
-		positionPart(head, 5 + idleShift * 1.4, bodyBob + headBob - Math.abs(idleSide) * 1.2, headWiggle + idleSide * 1.2);
+		positionPart(head, 5, bodyBob + headBob, headWiggle);
 
 		var mouthBob = headBob * 0.5 + Math.sin(time * 3) * 0.5;
 		positionPart(mouth, 0, mouthBob);
 		mouth.angle = head.angle + Math.sin(time * 6) * 1.5;
 
 		var tailWag = Math.sin(time * 3 + 0.5) * 12;
-		positionPart(tail, -40 - idleShift * 0.8, bodyBob + bodyBob * 0.6, tailWag - idleSide * 7);
+		positionPart(tail, -40, bodyBob + bodyBob * 0.6, tailWag);
 		setMouth(false);
 	}
 
@@ -269,7 +252,6 @@ class FlareonCharacter extends Character
 		var bodyBob:Float = loopWave * 1.5;
 		var headBob:Float = loopWave * 1.2 + attackPulse * 2;
 		var tailFlick:Float = tailWave * 4 + attackPulse * 5;
-		setPoseSquashStretch(anim, attackPulse);
 
 		switch(getPoseAnim(anim))
 		{
@@ -383,47 +365,13 @@ class FlareonCharacter extends Character
 	function isFireballAnim(anim:String):Bool
 		return getPoseAnim(anim) == 'shoot';
 
-	function setPoseSquashStretch(anim:String, attackPulse:Float)
-	{
-		var baseAnim:String = getPoseAnim(anim);
-		var amount:Float = switch(baseAnim)
-		{
-			case 'singLEFT', 'singDOWN', 'singUP', 'singRIGHT':
-				attackPulse;
-			case 'hey':
-				Math.sin(Math.min(singPoseTime / HEY_POSE_DURATION, 1) * Math.PI);
-			case 'hurt', 'hit':
-				1 - easePose(singPoseTime, HIT_POSE_DURATION);
-			case 'scared':
-				(Math.sin(singPoseTime * 18) + 1) * 0.35;
-			default:
-				Math.sin(easePose(singPoseTime, baseAnim == 'shoot' ? FIREBALL_DURATION : ACTION_POSE_DURATION) * Math.PI);
-		}
-		var direction:Float = switch(baseAnim)
-		{
-			case 'singUP', 'hey', 'attack', 'shoot':
-				-1; // reaching upward or lunging forward reads better as a tall stretch
-			case 'singDOWN', 'dodge':
-				1; // downward poses land with a broader squash
-			default:
-				0.7;
-		}
-		setSquashStretch(amount, direction);
-	}
-
-	function setSquashStretch(amount:Float, direction:Float)
-	{
-		poseScaleX = 1 + SQUASH_AMOUNT * amount * direction;
-		poseScaleY = 1 - STRETCH_AMOUNT * amount * direction;
-	}
-
 	function positionPart(spr:FlxSprite, offsetX:Float, offsetY:Float, angleValue:Float = 0, scaleX:Float = 1, scaleY:Float = 1)
 	{
 		var direction:Float = flipX ? -1 : 1;
 		spr.x = x + offsetX * direction;
 		spr.y = y + offsetY;
 		spr.angle = angleValue * direction;
-		spr.scale.set(scale.x * scaleX * poseScaleX, scale.y * scaleY * poseScaleY);
+		spr.scale.set(scale.x * scaleX, scale.y * scaleY);
 		spr.flipX = flipX;
 	}
 
@@ -1000,6 +948,7 @@ class FlareonCharacter extends Character
 		}
 		else if (isIdleAnim(AnimName))
 		{
+			currentAnim = 'idle';
 			mouthIsOpen = false;
 		}
 		else
@@ -1033,10 +982,7 @@ class FlareonCharacter extends Character
 	override public function dance()
 	{
 		if (!debugMode && !skipDance && !specialAnim)
-		{
-			danced = !danced;
-			playAnim(danced ? 'danceRight' : 'danceLeft');
-		}
+			playAnim('idle');
 	}
 
 	override public function hasAnimation(anim:String):Bool
